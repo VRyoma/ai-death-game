@@ -164,3 +164,5 @@ Build as a standalone Next.js Docker container. Dockerfile creation required.
 [CONTRIBUTING.md](CONTRIBUTING.md) をご覧ください。フォーク歓迎です。
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Forking is encouraged.
+
+**新キャラ追加ガイド / Adding Characters:** [docs/adding-characters.md](docs/adding-characters.md)

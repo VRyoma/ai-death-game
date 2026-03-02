@@ -4,7 +4,7 @@ This game was originally hosted on GCP, but running costs got too high — so we
 
 We're a tiny team and won't be actively maintaining this, so PRs may go unreviewed. If you find a critical bug, Issues are welcome — we'll do our best.
 
-もともとGCPでホストしていましたが、運用コストが厳しくなったためOSS化しました。皆さんの環境で自由に遊んでもらえたら嬉しいです。**フォーク大歓迎です。** 好きなように改造してください。
+もともとGCPでホストしていましたが、運用コストが厳しくなったこともあり、より自由に遊んでいただくためOSS化しました。皆さんの環境で遊んでもらえたら嬉しいです。**フォーク大歓迎です。** 好きなように改造してください。
 
 少人数で運営しており積極的なメンテナンスは難しいため、PRへの対応はお約束できません。重大なバグはIssueで報告いただければ、できる範囲で対応します。
 
@@ -33,6 +33,12 @@ cd ai-death-game
 npm install
 npm run dev
 ```
+
+## Adding New Characters / キャラクター追加
+
+See [docs/adding-characters.md](docs/adding-characters.md) for a step-by-step guide on adding new playable characters, including thumbnails, personality config, landing page setup, OGP images, and the unlock system.
+
+新キャラの追加手順は [docs/adding-characters.md](docs/adding-characters.md) を参照してください。サムネイル・キャラ設定・LP紹介・OGP・隠しキャラ解放の仕組みまですべてカバーしています。
 
 ## Coding Conventions
 
