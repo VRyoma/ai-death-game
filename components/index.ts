@@ -13,3 +13,4 @@ export { InterventionModal } from './InterventionModal';
 export { MemberSelectionOverlay } from './MemberSelectionOverlay';
 export { GameOverScreen } from './GameOverScreen';
 export { LandingPage } from './LandingPage';
+export { WebLLMSetupOverlay } from './WebLLMSetupOverlay';

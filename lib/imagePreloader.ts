@@ -3,6 +3,8 @@
  * ゲーム開始時にキャラ画像をブラウザキャッシュに載せる
  */
 
+import { getCharacterImagePath, getMasterImagePath } from './imagePath';
+
 const EXPRESSIONS = ['default', 'painful', 'happy', 'fainted'] as const;
 const MOUTH_STATES = ['0', '1'] as const;
 const MASTER_EXPRESSIONS = ['default'] as const;
@@ -28,14 +30,14 @@ const buildCharacterImageUrls = (characterIds: string[]): string[] => {
       for (const mouth of MOUTH_STATES) {
         // faintedは口閉じのみ
         if (expression === 'fainted' && mouth === '1') continue;
-        urls.push(`/agents/${characterId}_${expression}_${mouth}.jpg`);
+        urls.push(getCharacterImagePath(characterId, expression, parseInt(mouth, 10)));
       }
     }
   }
 
   for (const expression of MASTER_EXPRESSIONS) {
     for (const mouth of MOUTH_STATES) {
-      urls.push(`/agents/master_${expression}_${mouth}.jpg`);
+      urls.push(getMasterImagePath(expression, parseInt(mouth, 10)));
     }
   }
 

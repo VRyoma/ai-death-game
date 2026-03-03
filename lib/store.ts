@@ -113,11 +113,20 @@ interface GameStore {
   byokGmInstruction: string | null;
   byokError: string | null;
 
+  // LLMバックエンド選択
+  llmBackend: 'gemini' | 'webllm';
+  webllmModelId: string | null;
+  webllmStatus: 'idle' | 'loading' | 'ready' | 'error';
+  webllmProgress: number;
+  webllmProgressText: string;
+
   // Actions
   initializeGame: () => void;
   setByokMode: (isByok: boolean, apiKey: string | null) => void;
   setByokGmInstruction: (instruction: string | null) => void;
   setByokError: (error: string | null) => void;
+  setLLMBackend: (backend: 'gemini' | 'webllm', options?: { apiKey?: string; modelId?: string }) => void;
+  setWebLLMStatus: (status: 'idle' | 'loading' | 'ready' | 'error', progress?: number, text?: string) => void;
   setUIState: (state: UIState) => void;
   startGame: () => void;
   addLog: (type: LogType, content: string, agentId?: string, extra?: {
@@ -301,6 +310,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
   byokGmInstruction: null,
   byokError: null,
 
+  // LLMバックエンド
+  llmBackend: 'gemini',
+  webllmModelId: null,
+  webllmStatus: 'idle',
+  webllmProgress: 0,
+  webllmProgressText: '',
+
   // 統一UI状態マシン
   uiState: INITIAL_UI_STATE,
 
@@ -309,6 +325,26 @@ export const useGameStore = create<GameStore>((set, get) => ({
   setByokGmInstruction: (instruction) => set({ byokGmInstruction: instruction }),
 
   setByokError: (error) => set({ byokError: error }),
+
+  setLLMBackend: (backend, options) => {
+    if (backend === 'gemini') {
+      set({
+        llmBackend: 'gemini',
+        isByok: true,
+        byokApiKey: options?.apiKey ?? null,
+      });
+    } else {
+      set({
+        llmBackend: 'webllm',
+        isByok: false,
+        webllmModelId: options?.modelId ?? null,
+      });
+    }
+  },
+
+  setWebLLMStatus: (status, progress = 0, text = '') => {
+    set({ webllmStatus: status, webllmProgress: progress, webllmProgressText: text });
+  },
 
   // setUIState アクション
   setUIState: (state: UIState) => {
@@ -584,10 +620,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
           return;
         }
 
-        const { isByok, byokApiKey } = get();
+        const { isByok, byokApiKey, llmBackend } = get();
 
-        if (isByok && byokApiKey) {
-          // BYOK: 個別生成モード（byokGameFlowに委譲）
+        if ((isByok && byokApiKey) || llmBackend === 'webllm') {
+          // BYOK または WebLLM: 個別生成モード（byokGameFlowに委譲）
           // placeholder は byokGameFlow 側で管理するため、ここで作った placeholder を削除
           removePlaceholder();
           if (firstSpeaker) setAgentSpeaking(firstSpeaker.id, false);
@@ -668,10 +704,38 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       let results: CachedVoteResult[] = [];
 
-      const { isByok, byokApiKey } = get();
+      const { isByok, byokApiKey, llmBackend } = get();
 
-      if (isByok && byokApiKey) {
-        // BYOK: クライアントサイドで投票バッチを直接呼び出す
+      if (llmBackend === 'webllm') {
+        // WebLLMバックエンド
+        const { WebLLMAdapter } = await import('./webllmClient');
+        const adapter = new WebLLMAdapter();
+        const data = await adapter.voteBatch({
+          voters: aliveAgents,
+          candidates,
+          allAgents: agents,
+          recentLogs,
+          onError: (msg: string) => get().setByokError(msg),
+        });
+
+        const voteMap = new Map(
+          (Array.isArray(data.votes) ? data.votes : []).map((vote) => [vote.voter_id, vote])
+        );
+
+        results = aliveAgents.map((voter) => {
+          const vote = voteMap.get(voter.id);
+          const validTarget = candidates.find((candidate) => candidate.id === vote?.vote_target_id);
+          const targetId = validTarget ? validTarget.id : fallbackTargetId;
+          const target = agents.find((agent) => agent.id === targetId);
+          return {
+            voterId: voter.id,
+            voterName: voter.name,
+            targetId,
+            targetName: target?.name || fallbackTargetName,
+          };
+        });
+      } else if (isByok && byokApiKey) {
+        // Gemini BYOK: クライアントサイドで投票バッチを直接呼び出す
         const { byokVoteBatch } = await import('./byokClient');
         const data = await byokVoteBatch({
           voters: aliveAgents,
@@ -1008,7 +1072,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     try {
       // 全退場者の断末魔を並列でフェッチ
-      const { isByok, byokApiKey } = get();
+      const { isByok, byokApiKey, llmBackend } = get();
       const reactionPromises = eliminationQueue.map(async (item) => {
         const agent = agents.find((a) => a.id === item.agentId);
         if (!agent) return { agentId: item.agentId, reaction: 'なぜだ...' };
@@ -1018,8 +1082,22 @@ export const useGameStore = create<GameStore>((set, get) => ({
         const selfVoted = voteInfo && voteInfo.votedFor === item.agentId;
 
         try {
-          if (isByok && byokApiKey) {
-            // BYOK: クライアントサイドで直接呼び出す
+          if (llmBackend === 'webllm') {
+            // WebLLMバックエンド
+            const { WebLLMAdapter } = await import('./webllmClient');
+            const adapter = new WebLLMAdapter();
+            const data = await adapter.eliminationReaction({
+              agent,
+              eliminatedAgents: eliminationQueue.map((e) => ({ id: e.agentId, name: e.agentName })),
+              logs: logs.slice(-RECENT_LOGS_LIMIT_FOR_AI),
+              allAgents: agents,
+              selfVoted,
+              gmVote: userVote ?? undefined,
+              onError: (msg: string) => get().setByokError(msg),
+            });
+            return { agentId: item.agentId, reaction: data.reaction };
+          } else if (isByok && byokApiKey) {
+            // Gemini BYOK: クライアントサイドで直接呼び出す
             const { byokEliminationReaction } = await import('./byokClient');
             const data = await byokEliminationReaction({
               agent,

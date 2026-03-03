@@ -105,8 +105,8 @@ export async function byokProcessDiscussionTurn(
       return;
     }
 
-    const { byokApiKey, byokGmInstruction } = get();
-    if (!byokApiKey) {
+    const { byokApiKey, byokGmInstruction, llmBackend } = get();
+    if (!byokApiKey && llmBackend !== 'webllm') {
       removePlaceholder();
       setAgentSpeaking(speaker.id, false);
       set({ isProcessing: false });
@@ -125,18 +125,31 @@ export async function byokProcessDiscussionTurn(
 
     const recentLogs = logs.slice(-RECENT_LOGS_LIMIT_FOR_AI);
 
-    // 個別生成 API 呼び出し
-    const { byokDiscussionTurn } = await import('./byokClient');
-    const result = await byokDiscussionTurn(
-      {
+    // バックエンドに応じたアダプターで個別生成
+    let result;
+    if (llmBackend === 'webllm') {
+      const { WebLLMAdapter } = await import('./webllmClient');
+      const adapter = new WebLLMAdapter();
+      result = await adapter.discussionTurn({
         agent: speaker,
         allAgents: agents,
         recentLogs,
         promptContext,
         onError: (msg: string) => get().setByokError(msg),
-      },
-      byokApiKey
-    );
+      });
+    } else {
+      const { byokDiscussionTurn } = await import('./byokClient');
+      result = await byokDiscussionTurn(
+        {
+          agent: speaker,
+          allAgents: agents,
+          recentLogs,
+          promptContext,
+          onError: (msg: string) => get().setByokError(msg),
+        },
+        byokApiKey!
+      );
+    }
 
     // キャンセルチェック
     if (signal?.aborted) {

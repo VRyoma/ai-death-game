@@ -3,6 +3,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Expression } from '@/lib/types';
 import { ensureImageDecoded, isImageDecoded } from '@/lib/imagePreloader';
+import { getCharacterImagePath } from '@/lib/imagePath';
+
+const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || '';
 
 interface Props {
   characterId: string;
@@ -24,12 +27,13 @@ export const FocusPortrait: React.FC<Props> = ({
 }) => {
   const getTargetFrames = () => {
     if (!isAlive || expression === 'fainted') {
-      const fainted = `/agents/${characterId}_fainted_0.jpg`;
+      const fainted = getCharacterImagePath(characterId, 'fainted', 0);
       return { closed: fainted, open: null };
     }
 
-    const base = `/agents/${characterId}_${expression}`;
-    return { closed: `${base}_0.jpg`, open: `${base}_1.jpg` };
+    const closed = getCharacterImagePath(characterId, expression, 0);
+    const open = getCharacterImagePath(characterId, expression, 1);
+    return { closed, open };
   };
 
   const initialFrames = getTargetFrames();

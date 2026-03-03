@@ -1,27 +1,20 @@
 'use client';
 
 /**
- * BYOK（Bring Your Own Key）ページ
+ * BYOK / WebLLM 選択ページ
  *
- * ユーザー自身のGemini APIキーを入力・検証し、入場待機なしで
- * ゲームに直接入場するためのページ。
+ * バックエンド選択タブ:
+ *   - Gemini BYOK: APIキー入力 → 検証 → 入場
+ *   - WebLLM ローカル: モデル選択 → 入場（ゲームページでダウンロード）
  *
- * フロー:
- *   1. APIキー入力 → 「確認」で Gemini REST API に generateContent を送信して検証
- *   2. 検証成功 → sessionStorage にキーを保存 → 「入場」ボタンが有効化
- *   3. 「入場」→ /game?byok=1 に遷移（/wait をスキップ）
- *
- * セキュリティ:
- *   - キーはブラウザから直接 Gemini API へ送信（サーバーを経由しない）
- *   - sessionStorage に保存（タブを閉じると消去される）
- *   - サーバーサイドへの保存・ログ出力は一切行わない
- *
- * @see docs/20260218_byok_support.md 仕様ドキュメント
+ * WebGPU非対応ブラウザではWebLLMタブを無効化する。
  */
 
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useGameStore } from '@/lib/store';
+import { WEBLLM_MODELS, DEFAULT_WEBLLM_MODEL_ID, isWebGPUSupported } from '@/lib/webllmEngine';
 
 /** sessionStorage のキー名 */
 const BYOK_STORAGE_KEY = 'dg_byok_api_key';
@@ -33,18 +26,13 @@ const GEMINI_VALIDATE_URL =
 /** 検証状態 */
 type ValidationStatus = 'idle' | 'loading' | 'success' | 'error';
 
+type Tab = 'gemini' | 'webllm';
+
 /**
  * Gemini APIキーの有効性をクライアントサイドで検証する
- *
- * 軽量な generateContent リクエストを送信し、レスポンスのステータスコードで判定。
- * サーバーを経由せず、ブラウザから直接 Gemini API を呼ぶ。
- *
- * @param apiKey - 検証対象のGemini APIキー（`AIza...` 形式）
- * @returns ok: true なら検証成功、false ならエラーメッセージ付き
  */
 async function validateGeminiApiKey(apiKey: string): Promise<{ ok: boolean; error?: string }> {
   try {
-    // x-goog-api-key ヘッダーで認証（URL にキーを露出させない）
     const res = await fetch(GEMINI_VALIDATE_URL, {
       method: 'POST',
       headers: {
@@ -75,11 +63,25 @@ async function validateGeminiApiKey(apiKey: string): Promise<{ ok: boolean; erro
 
 export default function ByokPage() {
   const router = useRouter();
+  const setLLMBackend = useGameStore((s) => s.setLLMBackend);
+
+  const [tab, setTab] = useState<Tab>('webllm');
+  const [webGPUAvailable, setWebGPUAvailable] = useState(false);
+
+  // Gemini タブの状態
   const [apiKey, setApiKey] = useState('');
   const [status, setStatus] = useState<ValidationStatus>('idle');
   const [errorMessage, setErrorMessage] = useState('');
 
-  // sessionStorage に有効なキーが残っていれば復元（再入力不要にする）
+  // WebLLM タブの状態
+  const [selectedModelId, setSelectedModelId] = useState(DEFAULT_WEBLLM_MODEL_ID);
+
+  // WebGPU対応チェック（クライアントサイドのみ）
+  useEffect(() => {
+    setWebGPUAvailable(isWebGPUSupported());
+  }, []);
+
+  // sessionStorage に有効なキーが残っていれば復元
   useEffect(() => {
     try {
       const encoded = sessionStorage.getItem(BYOK_STORAGE_KEY);
@@ -99,7 +101,7 @@ export default function ByokPage() {
         setStatus('success');
       }
     } catch {
-      // デコード失敗等は無視して空欄スタート
+      // デコード失敗等は無視
     }
   }, []);
 
@@ -114,9 +116,7 @@ export default function ByokPage() {
 
     if (result.ok) {
       setStatus('success');
-      // Base64 エンコードして保存（平文での露出を避ける最低限の難読化）
       sessionStorage.setItem(BYOK_STORAGE_KEY, btoa(trimmed));
-      // 最終利用タイムスタンプ（30分無操作で自動失効させるため）
       sessionStorage.setItem(BYOK_STORAGE_KEY + '_ts', String(Date.now()));
     } else {
       setStatus('error');
@@ -124,11 +124,17 @@ export default function ByokPage() {
     }
   };
 
-  const handleEnter = () => {
+  const handleGeminiEnter = () => {
+    setLLMBackend('gemini', { apiKey: apiKey.trim() });
     router.push('/game');
   };
 
-  const isValidated = status === 'success';
+  const handleWebLLMEnter = () => {
+    setLLMBackend('webllm', { modelId: selectedModelId });
+    router.push('/game');
+  };
+
+  const isGeminiValidated = status === 'success';
 
   return (
     <div className="min-h-dvh relative bg-[#050505]">
@@ -138,96 +144,197 @@ export default function ByokPage() {
 
       <div className="relative z-10 flex min-h-dvh items-center justify-center px-4 py-8">
         <div className="w-full max-w-md">
-          {/* ターミナルボックス */}
           <div className="border-2 border-[#33ff00] bg-[#061206] p-6 shadow-[0_0_15px_rgba(51,255,0,0.2)]">
             {/* ヘッダー */}
-            <div className="mb-6">
-              <p className="text-xs text-[#33ff00]/60 mb-1">&gt; SYSTEM://AUTH</p>
+            <div className="mb-5">
+              <p className="text-xs text-[#33ff00]/60 mb-1">&gt; SYSTEM://LLM_BACKEND_SELECT</p>
               <h1 className="text-lg text-[#33ff00] font-bold">
-                API KEY AUTHENTICATION<span className="animate-pulse">_</span>
+                バックエンド選択<span className="animate-pulse">_</span>
               </h1>
             </div>
 
-            {/* 説明文 */}
-            <div className="text-sm text-[#6eb659] mb-4 leading-relaxed space-y-1.5">
-              <p>
-                Gemini APIキーを入力してください。
-                <br />
-                待機なし・回数無制限でプレイできます。
-              </p>
-              <p className="text-xs text-[#6eb659]/70">
-                キーはサーバーに送信されず、ブラウザからGoogleに直接通信します。
-              </p>
-            </div>
-            <Link
-              href="/byok/guide"
-              className="mb-6 block text-xs text-[#33ff00]/70 underline hover:text-[#33ff00] transition-colors"
-            >
-              APIキーとは？取得方法・セキュリティの詳細 →
-            </Link>
-
-            {/* APIキー入力フィールド */}
-            <div className="mb-4">
-              <label className="block text-xs text-[#33ff00]/70 mb-2">
-                &gt; API_KEY:
-              </label>
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => {
-                  setApiKey(e.target.value);
-                  if (status !== 'idle' && status !== 'loading') {
-                    setStatus('idle');
-                    setErrorMessage('');
-                  }
-                }}
-                placeholder="AIza..."
-                className="w-full bg-[#020802] border border-[#33ff00]/40 px-3 py-2.5 text-sm text-[#33ff00] placeholder-[#33ff00]/25 outline-none focus:border-[#33ff00] focus:shadow-[0_0_8px_rgba(51,255,0,0.3)] transition"
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && apiKey.trim()) handleValidate();
-                }}
-              />
+            {/* タブ切り替え */}
+            <div className="flex mb-5 border border-[#33ff00]/30">
+              <button
+                onClick={() => webGPUAvailable && setTab('webllm')}
+                disabled={!webGPUAvailable}
+                className={`flex-1 py-2 text-sm transition ${
+                  tab === 'webllm'
+                    ? 'bg-[#33ff00]/15 text-[#33ff00] border-r border-[#33ff00]/30'
+                    : webGPUAvailable
+                      ? 'text-[#33ff00]/50 hover:text-[#33ff00]/70 border-r border-[#33ff00]/20'
+                      : 'text-[#33ff00]/25 cursor-not-allowed'
+                }`}
+              >
+                WebLLM ローカル
+                {!webGPUAvailable && (
+                  <span className="ml-1 text-xs text-[#ff0055]/70">[非対応]</span>
+                )}
+              </button>
+              <button
+                onClick={() => setTab('gemini')}
+                className={`flex-1 py-2 text-sm transition ${
+                  tab === 'gemini'
+                    ? 'bg-[#33ff00]/15 text-[#33ff00]'
+                    : 'text-[#33ff00]/50 hover:text-[#33ff00]/70'
+                }`}
+              >
+                Gemini BYOK
+              </button>
             </div>
 
-            {/* 確認ボタン */}
-            <button
-              onClick={handleValidate}
-              disabled={!apiKey.trim() || status === 'loading'}
-              className="w-full border border-[#33ff00]/60 bg-[#0a1f0a] px-4 py-2.5 text-sm text-[#33ff00] transition hover:bg-[#33ff00]/15 disabled:opacity-30 disabled:cursor-not-allowed"
-            >
-              {status === 'loading' ? 'VERIFYING...' : '確認'}
-            </button>
+            {/* === Gemini BYOKタブ === */}
+            {tab === 'gemini' && (
+              <>
+                <div className="text-sm text-[#6eb659] mb-4 leading-relaxed space-y-1.5">
+                  <p>
+                    Gemini APIキーを入力してください。
+                    <br />
+                    待機なし・回数無制限でプレイできます。
+                  </p>
+                  <p className="text-xs text-[#6eb659]/70">
+                    キーはサーバーに送信されず、ブラウザからGoogleに直接通信します。
+                  </p>
+                </div>
+                <Link
+                  href="/byok/guide"
+                  className="mb-5 block text-xs text-[#33ff00]/70 underline hover:text-[#33ff00] transition-colors"
+                >
+                  APIキーとは？取得方法・セキュリティの詳細 →
+                </Link>
 
-            {/* 検証結果表示 */}
-            {status === 'success' && (
-              <div className="mt-4 border border-[#33ff00]/40 bg-[#001a00] px-3 py-2 text-sm text-[#33ff00]">
-                AUTHENTICATED - キーが確認されました
+                <div className="mb-4">
+                  <label className="block text-xs text-[#33ff00]/70 mb-2">&gt; API_KEY:</label>
+                  <input
+                    type="password"
+                    value={apiKey}
+                    onChange={(e) => {
+                      setApiKey(e.target.value);
+                      if (status !== 'idle' && status !== 'loading') {
+                        setStatus('idle');
+                        setErrorMessage('');
+                      }
+                    }}
+                    placeholder="AIza..."
+                    className="w-full bg-[#020802] border border-[#33ff00]/40 px-3 py-2.5 text-sm text-[#33ff00] placeholder-[#33ff00]/25 outline-none focus:border-[#33ff00] focus:shadow-[0_0_8px_rgba(51,255,0,0.3)] transition"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && apiKey.trim()) handleValidate();
+                    }}
+                  />
+                </div>
+
+                <button
+                  onClick={handleValidate}
+                  disabled={!apiKey.trim() || status === 'loading'}
+                  className="w-full border border-[#33ff00]/60 bg-[#0a1f0a] px-4 py-2.5 text-sm text-[#33ff00] transition hover:bg-[#33ff00]/15 disabled:opacity-30 disabled:cursor-not-allowed"
+                >
+                  {status === 'loading' ? 'VERIFYING...' : '確認'}
+                </button>
+
+                {status === 'success' && (
+                  <div className="mt-4 border border-[#33ff00]/40 bg-[#001a00] px-3 py-2 text-sm text-[#33ff00]">
+                    AUTHENTICATED - キーが確認されました
+                  </div>
+                )}
+                {status === 'error' && (
+                  <div className="mt-4 border border-[#ff4d6d]/40 bg-[#1a0008] px-3 py-2 text-sm text-[#ff4d6d]">
+                    AUTHENTICATION FAILED - {errorMessage}
+                  </div>
+                )}
+
+                <div className="my-5 border-t border-[#33ff00]/20" />
+
+                <button
+                  onClick={handleGeminiEnter}
+                  disabled={!isGeminiValidated}
+                  className={`w-full border-2 px-4 py-3 text-base font-bold transition ${
+                    isGeminiValidated
+                      ? 'border-[#33ff00] bg-[#061206] text-[#33ff00] hover:bg-[#33ff00]/15'
+                      : 'border-[#33ff00]/20 bg-[#061206] text-[#33ff00]/20 cursor-not-allowed'
+                  }`}
+                >
+                  入場
+                </button>
+              </>
+            )}
+
+            {/* === WebLLMタブ === */}
+            {tab === 'webllm' && (
+              <>
+                <div className="text-sm text-[#6eb659] mb-4 leading-relaxed space-y-1.5">
+                  <p>
+                    APIキー不要。モデルをブラウザにダウンロードして、
+                    <br />
+                    完全ローカルで推論します。
+                  </p>
+                  <p className="text-xs text-[#6eb659]/70">
+                    初回はモデルのダウンロードが必要です（数GB）。
+                    2回目以降はキャッシュから高速起動します。
+                  </p>
+                </div>
+
+                {/* モデル選択 */}
+                <div className="mb-5">
+                  <label className="block text-xs text-[#33ff00]/70 mb-2">&gt; MODEL_SELECT:</label>
+                  <div className="space-y-2">
+                    {WEBLLM_MODELS.map((model) => (
+                      <label
+                        key={model.id}
+                        className={`flex items-start gap-3 border p-3 cursor-pointer transition ${
+                          selectedModelId === model.id
+                            ? 'border-[#33ff00] bg-[#33ff00]/10'
+                            : 'border-[#33ff00]/30 hover:border-[#33ff00]/60'
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="webllm-model"
+                          value={model.id}
+                          checked={selectedModelId === model.id}
+                          onChange={() => setSelectedModelId(model.id)}
+                          className="mt-0.5 accent-[#33ff00]"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm text-[#33ff00] font-medium">{model.displayName}</span>
+                            <span className="text-xs text-[#33ff00]/50 border border-[#33ff00]/30 px-1.5 py-0.5">
+                              {model.sizeLabel}
+                            </span>
+                            {model.recommended && (
+                              <span className="text-xs text-[#33ff00]/70 border border-[#33ff00]/40 px-1.5 py-0.5 bg-[#33ff00]/10">
+                                推奨
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-[#6eb659]/70 mt-1 leading-relaxed">
+                            {model.description}
+                          </p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="my-5 border-t border-[#33ff00]/20" />
+
+                <button
+                  onClick={handleWebLLMEnter}
+                  className="w-full border-2 border-[#33ff00] bg-[#061206] px-4 py-3 text-base font-bold text-[#33ff00] transition hover:bg-[#33ff00]/15"
+                >
+                  入場（モデルをロード）
+                </button>
+              </>
+            )}
+
+            {/* WebGPU非対応の説明 */}
+            {!webGPUAvailable && (
+              <div className="mt-4 border border-[#ff0055]/30 bg-[#1a0008] px-3 py-2 text-xs text-[#ff4d6d]/80">
+                WebLLM ローカルには WebGPU 対応ブラウザが必要です（Chrome 113+ / Edge 113+）。
               </div>
             )}
-            {status === 'error' && (
-              <div className="mt-4 border border-[#ff4d6d]/40 bg-[#1a0008] px-3 py-2 text-sm text-[#ff4d6d]">
-                AUTHENTICATION FAILED - {errorMessage}
-              </div>
-            )}
-
-            {/* 区切り線 */}
-            <div className="my-6 border-t border-[#33ff00]/20" />
-
-            {/* 入場ボタン（検証成功後に有効化） */}
-            <button
-              onClick={handleEnter}
-              disabled={!isValidated}
-              className={`w-full border-2 px-4 py-3 text-base font-bold transition ${
-                isValidated
-                  ? 'border-[#33ff00] bg-[#061206] text-[#33ff00] hover:bg-[#33ff00]/15'
-                  : 'border-[#33ff00]/20 bg-[#061206] text-[#33ff00]/20 cursor-not-allowed'
-              }`}
-            >
-              入場
-            </button>
 
             {/* トップへ戻るリンク */}
-            <div className="mt-6 text-center">
+            <div className="mt-5 text-center">
               <Link
                 href="/"
                 className="text-xs text-[#6eb659]/70 underline hover:text-[#33ff00] transition"

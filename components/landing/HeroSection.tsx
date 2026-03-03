@@ -3,6 +3,7 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import { getImagePath } from '@/lib/imagePath';
 
 interface Props {
   onScrollToHowItWorks: () => void;
@@ -15,7 +16,7 @@ export const HeroSection: React.FC<Props> = ({ onScrollToHowItWorks }) => {
         <div className="relative overflow-hidden bg-black">
           <div className="relative aspect-[1200/1789] w-full">
             <Image
-              src="/images/lp/hero-image.jpg"
+              src={getImagePath('/images/lp/hero-image.jpg')}
               alt="AIデスゲームのヒーロービジュアル"
               fill
               priority
@@ -29,7 +30,7 @@ export const HeroSection: React.FC<Props> = ({ onScrollToHowItWorks }) => {
           <div className="absolute left-1/2 top-[4.2%] z-20 w-[86%] -translate-x-1/2 md:w-[78%]">
             <div className="hero-logo-glitch relative">
               <Image
-                src="/images/lp/hero-logo.webp"
+                src={getImagePath('/images/lp/hero-logo.webp')}
                 alt="AIデスゲーム ロゴ"
                 width={1000}
                 height={338}
@@ -38,7 +39,7 @@ export const HeroSection: React.FC<Props> = ({ onScrollToHowItWorks }) => {
                 className="h-auto w-full drop-shadow-[0_0_14px_rgba(0,0,0,0.8)]"
               />
               <Image
-                src="/images/lp/hero-logo.webp"
+                src={getImagePath('/images/lp/hero-logo.webp')}
                 alt=""
                 aria-hidden
                 width={1000}
@@ -47,7 +48,7 @@ export const HeroSection: React.FC<Props> = ({ onScrollToHowItWorks }) => {
                 className="hero-logo-rgb-red pointer-events-none absolute inset-0 h-auto w-full"
               />
               <Image
-                src="/images/lp/hero-logo.webp"
+                src={getImagePath('/images/lp/hero-logo.webp')}
                 alt=""
                 aria-hidden
                 width={1000}

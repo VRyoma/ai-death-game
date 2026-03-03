@@ -6,6 +6,7 @@ import { canPlay, getRemainingPlays, getMaxPlaysPerDay } from '@/lib/playLimit';
 import { getMaxAchievedRarity } from '@/lib/hiddenCharacter';
 import { AGENT_PERSONALITIES } from '@/lib/constants';
 import { useGameStore } from '@/lib/store';
+import { getCharacterImagePath } from '@/lib/imagePath';
 
 interface Props {
   agents: Agent[];
@@ -183,7 +184,7 @@ export const MemberSelectionOverlay: React.FC<Props> = ({
  * メンバーカード（サムネイル + 名前）
  */
 const MemberCard: React.FC<{ agent: Agent }> = ({ agent }) => {
-  const imageSrc = `/agents/${agent.characterId}_default_0.jpg`;
+  const imageSrc = getCharacterImagePath(agent.characterId, 'default', 0);
 
   return (
     <div className="flex flex-col items-center">

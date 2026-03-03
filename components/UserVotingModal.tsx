@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Agent, UserVote, UserVoteType } from '@/lib/types';
+import { getCharacterImagePath } from '@/lib/imagePath';
 
 interface Props {
   isOpen: boolean;
@@ -71,7 +72,7 @@ export const UserVotingModal: React.FC<Props> = ({ isOpen, candidates, onVote })
                 }`}
               >
                 <img
-                  src={`/agents/${agent.characterId}_default_0.jpg`}
+                  src={getCharacterImagePath(agent.characterId, 'default', 0)}
                   alt={agent.name}
                   className="w-full h-full object-cover"
                   style={{

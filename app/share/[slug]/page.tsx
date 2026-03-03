@@ -70,6 +70,12 @@ const DEFAULT_OGP = {
   image: '/ogp/default.jpg',
 };
 
+export async function generateStaticParams() {
+  return Object.keys(TROPHY_OGP_DATA).map((slug) => ({
+    slug,
+  }));
+}
+
 interface Props {
   params: Promise<{ slug: string }>;
 }

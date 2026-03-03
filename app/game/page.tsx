@@ -21,6 +21,7 @@ import {
   GameOverScreen,
   DialogPhase,
   ContentPhase,
+  WebLLMSetupOverlay,
 } from '@/components';
 import { InterventionModal } from '@/components/InterventionModal';
 import { UserVotingModal } from '@/components/UserVotingModal';
@@ -91,6 +92,10 @@ export default function GamePage() {
     // BYOK エラー通知
     byokError,
     setByokError,
+    // LLMバックエンド
+    llmBackend,
+    webllmModelId,
+    webllmStatus,
   } = useGameStore();
 
   // UI状態
@@ -325,6 +330,9 @@ export default function GamePage() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    // WebLLMバックエンドはAPIキー不要 — sessionStorageチェックをスキップ
+    if (llmBackend === 'webllm') return;
+
     const byokKeyEncoded = sessionStorage.getItem('dg_byok_api_key');
     if (!byokKeyEncoded) {
       router.replace('/byok');
@@ -355,7 +363,7 @@ export default function GamePage() {
     // タイムスタンプを更新（プレイ開始 = 最終利用）
     sessionStorage.setItem('dg_byok_api_key_ts', String(Date.now()));
     useGameStore.getState().setByokMode(true, byokKey);
-  }, [router]);
+  }, [router, llmBackend]);
 
   // currentLogIndexが変わったときに、適切なcontentPhaseを設定
   useEffect(() => {
@@ -1008,10 +1016,20 @@ export default function GamePage() {
           ? agents.find((a) => a.id === winnerIds[currentVictoryIndex === 0 ? 1 : 0])
           : undefined;
 
-        const { byokApiKey } = useGameStore.getState();
+        const { byokApiKey, llmBackend: backend } = useGameStore.getState();
         let data: unknown = null;
 
-        if (byokApiKey) {
+        if (backend === 'webllm') {
+          const { WebLLMAdapter } = await import('@/lib/webllmClient');
+          const adapter = new WebLLMAdapter();
+          data = await adapter.victoryComment({
+            agent: winner,
+            logs,
+            allAgents: agents,
+            coSurvivor,
+            onError: (msg: string) => useGameStore.getState().setByokError(msg),
+          });
+        } else if (byokApiKey) {
           const { byokVictoryComment } = await import('@/lib/byokClient');
           data = await byokVictoryComment(
             { agent: winner, logs, allAgents: agents, coSurvivor },
@@ -1137,14 +1155,25 @@ export default function GamePage() {
     const participants = agents.map((a) => ({ name: a.name, isAlive: a.isAlive }));
 
     // クライアントサイドでモデレーション実行
-    const { byokApiKey } = useGameStore.getState();
-    if (!byokApiKey) return;
+    const { byokApiKey, llmBackend: interventionBackend } = useGameStore.getState();
+    if (!byokApiKey && interventionBackend !== 'webllm') return;
 
-    const { byokModerateIntervention } = await import('@/lib/byokClient');
-    const result = await byokModerateIntervention(
-      { instruction: text, participants },
-      byokApiKey
-    );
+    let result;
+    if (interventionBackend === 'webllm') {
+      const { WebLLMAdapter } = await import('@/lib/webllmClient');
+      const adapter = new WebLLMAdapter();
+      result = await adapter.moderateIntervention({
+        instruction: text,
+        participants,
+        onError: (msg: string) => useGameStore.getState().setByokError(msg),
+      });
+    } else {
+      const { byokModerateIntervention } = await import('@/lib/byokClient');
+      result = await byokModerateIntervention(
+        { instruction: text, participants },
+        byokApiKey!
+      );
+    }
 
     setInterventionUsedKey(submitTurnKey);
 
@@ -1269,6 +1298,11 @@ export default function GamePage() {
 
   return (
     <div className="h-dvh max-h-dvh overflow-hidden relative">
+      {/* WebLLM セットアップオーバーレイ（モデルロード完了まで表示） */}
+      {llmBackend === 'webllm' && webllmStatus !== 'ready' && webllmModelId && (
+        <WebLLMSetupOverlay modelId={webllmModelId} />
+      )}
+
       {/* CRTオーバーレイ */}
       <div className="absolute inset-0 z-50 pointer-events-none crt-overlay opacity-30" />
       <div className="absolute inset-0 z-40 pointer-events-none bg-green-500/[0.02] mix-blend-overlay" />

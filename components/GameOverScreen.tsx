@@ -6,6 +6,7 @@ import { useGameStore } from '@/lib/store';
 import { evaluateTrophies, getMostRareTrophy, getTrophySlug } from '@/lib/trophies';
 import { getMaxAchievedRarity, setMaxAchievedRarity } from '@/lib/hiddenCharacter';
 import { AGENT_PERSONALITIES } from '@/lib/constants';
+import { getCharacterImagePath, getImagePath } from '@/lib/imagePath';
 
 interface Props {
   onRestart: () => void;
@@ -122,7 +123,7 @@ export const GameOverScreen: React.FC<Props> = ({ onRestart, onViewLog, disableU
       {/* サービスロゴ */}
       <div className="w-[86%] max-w-md md:w-[78%] mb-6">
         <Image
-          src="/images/lp/hero-logo.webp"
+          src={getImagePath('/images/lp/hero-logo.webp')}
           alt="AIデスゲーム"
           width={1000}
           height={338}
@@ -139,7 +140,7 @@ export const GameOverScreen: React.FC<Props> = ({ onRestart, onViewLog, disableU
             style={{ boxShadow: '0 0 20px rgba(51, 255, 0, 0.4)' }}
           >
             <Image
-              src={`/agents/${winner.characterId}_happy_0.jpg`}
+              src={getCharacterImagePath(winner.characterId, 'happy', 0)}
               alt={winner.name}
               fill
               className="object-cover"
@@ -156,7 +157,7 @@ export const GameOverScreen: React.FC<Props> = ({ onRestart, onViewLog, disableU
                 style={{ boxShadow: '0 0 20px rgba(51, 255, 0, 0.4)' }}
               >
                 <Image
-                  src={`/agents/${s.characterId}_happy_0.jpg`}
+                  src={getCharacterImagePath(s.characterId, 'happy', 0)}
                   alt={s.name}
                   fill
                   className="object-cover"
@@ -172,7 +173,7 @@ export const GameOverScreen: React.FC<Props> = ({ onRestart, onViewLog, disableU
             style={{ boxShadow: '0 0 20px rgba(255, 0, 85, 0.4)' }}
           >
             <Image
-              src="/images/gameover/annihilation.jpg"
+              src={getImagePath('/images/gameover/annihilation.jpg')}
               alt="全滅"
               fill
               className="object-cover"

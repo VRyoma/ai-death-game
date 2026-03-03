@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { audioService } from '@/lib/audio';
+import { getCharacterImagePath } from '@/lib/imagePath';
 
 interface Props {
   characterId: string;
@@ -86,8 +87,8 @@ export const MiniPortrait: React.FC<Props> = ({
 
   // 画像パス: 常にdefault_0、脱落時のみfainted_0
   const imageSrc = isAlive
-    ? `/agents/${characterId}_default_0.jpg`
-    : `/agents/${characterId}_fainted_0.jpg`;
+    ? getCharacterImagePath(characterId, 'default', 0)
+    : getCharacterImagePath(characterId, 'fainted', 0);
 
   // 発言中の枠グロー
   const borderClass = isSpeaking

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
+import { getImagePath } from '@/lib/imagePath';
 
 /**
  * BYOK ガイドページ
@@ -235,7 +236,7 @@ export default function ByokGuidePage() {
         {/* 注意事項 */}
         <section className="mb-10">
           <img
-            src="/images/byok/key-caution.jpg"
+            src={getImagePath('/images/byok/key-caution.jpg')}
             alt="ゲーム司会者からのAPIキー取り扱い注意"
             className="w-full rounded-lg mb-10"
           />

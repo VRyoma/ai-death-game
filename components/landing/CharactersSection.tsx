@@ -3,6 +3,7 @@
 import React, { useState, useRef, useCallback } from 'react';
 import Image from 'next/image';
 import type { LandingCharacter } from '../LandingPage';
+import { getCharacterImagePath, getMasterImagePath, getImagePath } from '@/lib/imagePath';
 
 interface Props {
   characters: LandingCharacter[];
@@ -80,9 +81,9 @@ export const CharactersSection: React.FC<Props> = ({ characters }) => {
       secret4: 'c-secret-04.jpg',
     };
     if (id in secretMap) {
-      return `/images/lp/${secretMap[id]}`;
+      return getImagePath(`/images/lp/${secretMap[id]}`);
     }
-    return `/images/lp/c-${id}.jpg`;
+    return getImagePath(`/images/lp/c-${id}.jpg`);
   };
 
   // 隣のキャラクターのインデックスを取得（プリロード用）
@@ -92,12 +93,12 @@ export const CharactersSection: React.FC<Props> = ({ characters }) => {
   // サムネイル画像のパスを取得
   const getThumbnailImage = (id: string) => {
     if (id === 'moderator') {
-      return '/agents/master_default_0.jpg';
+      return getMasterImagePath('default', 0);
     }
     if (id.startsWith('secret')) {
-      return '/images/lp/c-secret-face.jpg';
+      return getImagePath('/images/lp/c-secret-face.jpg');
     }
-    return `/agents/${id}_default_0.jpg`;
+    return getCharacterImagePath(id, 'default', 0);
   };
 
   return (
