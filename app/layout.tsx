@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { DotGothic16, VT323 } from 'next/font/google';
 import './globals.css';
+import { getImagePath } from '@/lib/imagePath';
 
 const dotGothic = DotGothic16({
   weight: '400',
@@ -28,7 +29,7 @@ export const metadata: Metadata = {
     type: 'website',
   },
   icons: {
-    icon: '/images/favicon.ico',
+    icon: getImagePath('/images/favicon.ico'),
   },
 };
 

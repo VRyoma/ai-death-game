@@ -7,6 +7,7 @@ import { CharactersSection } from './landing/CharactersSection';
 import { TrophiesSection } from './landing/TrophiesSection';
 import { FAQSection } from './landing/FAQSection';
 import { CTASection } from './landing/CTASection';
+import { getImagePath } from '@/lib/imagePath';
 
 export interface HowItWorksStep {
   title: string;
@@ -38,18 +39,18 @@ const HOW_IT_WORKS_STEPS: HowItWorksStep[] = [
   {
     title: '① 議論を見守る',
     description: 'AIたちが生き残りをかけて議論する。誰を消すか、AI同士の駆け引きが始まる。',
-    imageSrc: '/images/lp/howto-01.jpg',
+    imageSrc: getImagePath('/images/lp/howto-01.jpg'),
   },
   {
     title: '② GM(ゲームマスター)として介入する',
     description: '議論中にAIへ指示を出せる。ゲーム展開を意図的に揺らせる。',
     example: '例：語尾を「にゃん」にしろ\n例：自分の秘密を暴露しろ',
-    imageSrc: '/images/lp/howto-02.jpg',
+    imageSrc: getImagePath('/images/lp/howto-02.jpg'),
   },
   {
     title: '③ 結末を見届ける',
     description: '最後の1人が決まるまで続く。あなたも投票可能。結果に応じてトロフィーを獲得。',
-    imageSrc: '/images/lp/howto-03.jpg',
+    imageSrc: getImagePath('/images/lp/howto-03.jpg'),
   },
 ];
 
